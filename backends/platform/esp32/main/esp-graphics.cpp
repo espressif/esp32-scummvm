@@ -21,36 +21,25 @@
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
-#include "backends/fs/posix/posix-iostream.h"
 
-#include <sys/stat.h>
-#include <stdio.h>
+#include "common/config-manager.h"
+#include "common/str.h"
+#include "common/textconsole.h"	// for warning() & error()
+#include "common/translation.h"
+#include "engines/engine.h"
+#include "graphics/blit.h"
+#include "gui/ThemeEngine.h"
+#include "esp-graphics.h"
 
-PosixIoStream::PosixIoStream(void *handle) :
-		StdioStream(handle) {
+#include "esp_log.h"
+
+#define TAG "EspGraphics"
+
+void EspGraphicsManager::initSize(uint width, uint height, const Graphics::PixelFormat *format) {
+	ESP_LOGI(TAG, "initSize %d %d", width, height);
+//	_width = width;
+//	_height = height;
+//	_format = format ? *format : Graphics::PixelFormat::createFormatCLUT8();
 }
 
-int64 PosixIoStream::size() const {
-#ifdef SYSTEM_NOT_SUPPORTING_FILENO
-	FILE *f=(FILE *)_handle;
-	long p=ftell(f);
-	fseek(f, 0, SEEK_END);
-	int64 r=ftell(f);
-	fseek(f, p, SEEK_SET);
-	return r;
-#else
-	int fd = fileno((FILE *)_handle);
-	if (fd == -1) {
-		return StdioStream::size();
-	}
 
-	// Using fstat to obtain the file size is generally faster than fseek / ftell
-	// because it does not affect the IO buffer.
-	struct stat st;
-	if (fstat(fd, &st) == -1) {
-		return StdioStream::size();
-	}
-
-	return st.st_size;
-#endif
-}

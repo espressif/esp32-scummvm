@@ -412,6 +412,15 @@ MODULE_OBJS += \
 	fs/n64/romfsstream.o
 endif
 
+ifeq ($(BACKEND),esp32)
+MODULE_OBJS += \
+	fs/posix/posix-fs.o \
+	fs/posix/posix-iostream.o \
+	fs/posix-drives/posix-drives-fs.o \
+	fs/posix-drives/posix-drives-fs-factory.o \
+	mixer/null/null-mixer.o
+endif
+
 ifeq ($(BACKEND),null)
 MODULE_OBJS += \
 	mixer/null/null-mixer.o
