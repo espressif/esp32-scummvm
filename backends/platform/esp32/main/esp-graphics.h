@@ -23,12 +23,24 @@
 #define BACKENDS_GRAPHICS_ESP_H
 
 #include "backends/graphics/graphics.h"
+#include "graphics/surface.h"
+#include "esp_timer.h"
+#include "esp_lcd_panel_interface.h"
+#include "esp_lcd_panel_io_interface.h"
+#include "esp_lcd_panel_ops.h"
+#include "driver/ppa.h"
+#include "bsp/touch.h"
 
 class EspGraphicsManager : public GraphicsManager {
 public:
 	virtual ~EspGraphicsManager() {}
 
-	bool hasFeature(OSystem::Feature f) const override { return false; }
+	void init();
+	bool hasFeature(OSystem::Feature f) const override { 
+		if (f==OSystem::kFeatureTouchscreen) return true;
+		if (f==OSystem::kFeatureNoQuit) return true;
+		return false; 
+	}
 	void setFeatureState(OSystem::Feature f, bool enable) override {}
 	bool getFeatureState(OSystem::Feature f) const override { return false; }
 
@@ -52,19 +64,19 @@ public:
 
 	int getScreenChangeID() const override { return 0; }
 
-	void beginGFXTransaction() override {}
-	OSystem::TransactionError endGFXTransaction() override { return OSystem::kTransactionSuccess; }
+	void beginGFXTransaction() override;
+	OSystem::TransactionError endGFXTransaction() override;
 
 	int16 getHeight() const override { return _height; }
 	int16 getWidth() const override { return _width; }
-	void setPalette(const byte *colors, uint start, uint num) override {}
-	void grabPalette(byte *colors, uint start, uint num) const override {}
-	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) override {}
-	Graphics::Surface *lockScreen() override { return NULL; }
-	void unlockScreen() override {}
+	void setPalette(const byte *colors, uint start, uint num) override;
+	void grabPalette(byte *colors, uint start, uint num) const override;
+	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) override;
+	Graphics::Surface *lockScreen() override;
+	void unlockScreen() override;
 	void fillScreen(uint32 col) override {}
 	void fillScreen(const Common::Rect &r, uint32 col) override {}
-	void updateScreen() override {}
+	void updateScreen() override;
 	void setShakePos(int shakeXOffset, int shakeYOffset) override {}
 	void setFocusRectangle(const Common::Rect& rect) override {}
 	void clearFocusRectangle() override {}
@@ -72,22 +84,32 @@ public:
 	void showOverlay(bool inGUI) override { _overlayVisible = true; }
 	void hideOverlay() override { _overlayVisible = false; }
 	bool isOverlayVisible() const override { return _overlayVisible; }
+	//RGB565 as used in display
 	Graphics::PixelFormat getOverlayFormat() const override { return Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0); }
-	void clearOverlay() override {}
-	void grabOverlay(Graphics::Surface &surface) const override {}
-	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) override {}
-	int16 getOverlayHeight() const override { return _height; }
-	int16 getOverlayWidth() const override { return _width; }
+	void clearOverlay() override;
+	void grabOverlay(Graphics::Surface &surface) const override;
+	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) override;
+	int16 getOverlayHeight() const override;
+	int16 getOverlayWidth() const override;
 
 	bool showMouse(bool visible) override { return !visible; }
 	void warpMouse(int x, int y) override {}
 	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override {}
 	void setCursorPalette(const byte *colors, uint start, uint num) override {}
 
+	bool getTouch(Common::Point &pos);
+
 private:
 	uint _width, _height;
 	Graphics::PixelFormat _format;
+	Graphics::Surface _surf;
 	bool _overlayVisible;
+	int64_t _last_time_updated;
+	esp_lcd_panel_handle_t _panel_handle = NULL;
+	esp_lcd_panel_io_handle_t _io_handle = NULL;
+	esp_lcd_touch_handle_t _touch_handle;
+	ppa_client_handle_t _ppa;
+	uint16_t *_overlay;
 };
 
 #endif

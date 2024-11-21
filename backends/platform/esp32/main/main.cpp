@@ -28,15 +28,7 @@
 
 #define TAG "main"
 
-// We use some stdio.h functionality here thus we need to allow some
-// symbols. Alternatively, we could simply allow everything by defining
-// FORBIDDEN_SYMBOL_ALLOW_ALL
-#define FORBIDDEN_SYMBOL_EXCEPTION_FILE
-#define FORBIDDEN_SYMBOL_EXCEPTION_stdout
-#define FORBIDDEN_SYMBOL_EXCEPTION_stderr
-#define FORBIDDEN_SYMBOL_EXCEPTION_fputs
-#define FORBIDDEN_SYMBOL_EXCEPTION_exit
-#define FORBIDDEN_SYMBOL_EXCEPTION_time_h
+#define FORBIDDEN_SYMBOL_ALLOW_ALL
 
 #include "../../../../../config.h"
 
@@ -55,6 +47,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "esp_timer.h"
 
 /*
  * Include header files needed for the getFilesystemFactory() method.
@@ -88,6 +81,9 @@ protected:
 private:
 	timeval _startTime;
 	bool _silenceLogs;
+	bool _was_touched;
+	bool _mousedown_queued;
+	int64_t _last_ts_time_us;
 };
 
 OSystem_esp32::OSystem_esp32(bool silenceLogs) :
@@ -105,7 +101,9 @@ void OSystem_esp32::initBackend() {
 	_timerManager = new DefaultTimerManager();
 	_eventManager = new DefaultEventManager(this);
 	_savefileManager = new DefaultSaveFileManager();
-	_graphicsManager = new EspGraphicsManager();
+	EspGraphicsManager *gfx = new EspGraphicsManager();
+	_graphicsManager = gfx;
+	gfx->init();
 	_mixerManager = new NullMixerManager();
 	// Setup and start mixer
 	_mixerManager->init();
@@ -123,6 +121,33 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 	((DefaultTimerManager *)getTimerManager())->checkTimers();
 	((NullMixerManager *)_mixerManager)->update(1);
 
+
+	if (_mousedown_queued) {
+		event.type = Common::EVENT_LBUTTONDOWN;
+		_mousedown_queued=false;
+		return true;
+	}
+
+
+	if (esp_timer_get_time()-_last_ts_time_us>(1000000/60)) {
+		_last_ts_time_us=esp_timer_get_time();
+		Common::Point pos;
+		EspGraphicsManager *gfx=(EspGraphicsManager *)_graphicsManager;
+		bool touched=gfx->getTouch(pos);
+		if (touched && !_was_touched) {
+			if (!_was_touched) _mousedown_queued=true;
+			event.type = Common::EVENT_MOUSEMOVE;
+			event.mouse = pos;
+//			ESP_LOGI(TAG, "ts %d,%d", pos.x, pos.y);
+			_was_touched = true;
+			return true;
+		} else if (!touched && _was_touched) {
+			event.type = Common::EVENT_LBUTTONUP;
+//			ESP_LOGI(TAG, "ts up");
+			_was_touched = false;
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -195,8 +220,8 @@ extern "C" {
 
 void main_task(void *param) {
 	// Invoke the actual ScummVM main entry point:
-	const char *argv[]={"scummvm"};
-	int res = scummvm_main(1, argv);
+	const char *argv[]={"scummvm", "-d", "11"};
+	int res = scummvm_main(sizeof(argv)/sizeof(argv[0]), argv);
 	ESP_LOGW(TAG, "Scummvm_main done");
 	g_system->destroy();
 }
