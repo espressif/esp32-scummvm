@@ -54,7 +54,7 @@ void EspGraphicsManager::init() {
 		.oper_type=PPA_OPERATION_SRM,
 	};
 	ESP_ERROR_CHECK(ppa_register_client(&ppa_cfg, &_ppa));
-	_overlay=(uint16_t*)calloc(SCREEN_WIDTH*SCREEN_HEIGHT, sizeof(uint16_t));
+	_overlay.create(SCREEN_WIDTH, SCREEN_HEIGHT, getOverlayFormat());
 	ESP_ERROR_CHECK(bsp_touch_new(NULL, &_touch_handle));
 }
 
@@ -88,7 +88,7 @@ void EspGraphicsManager::updateScreen() {
 	uint16_t *lcdbuf;
  	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
 	if (_overlayVisible) {
-		memcpy(lcdbuf, _overlay, SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
+		memcpy(lcdbuf, _overlay->getPixels(), SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
 	}
 	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
 }
@@ -148,12 +148,7 @@ void EspGraphicsManager::grabPalette(byte *colors, uint start, uint num) const {
 
 void EspGraphicsManager::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
 	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToOverlay");
-	const uint16_t *src=(const uint16_t*)buf;
-	for (int py=0; py<h; py++) {
-		const uint16_t *s=&src[(pitch/2)*(y+py)+x];
-		uint16_t *d=&_overlay[SCREEN_WIDTH*(y+py)+x];
-		memcpy((void*)d, (const void*)s, w*sizeof(uint16_t));
-	}
+	_overlay->copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
 void EspGraphicsManager::grabOverlay(Graphics::Surface &surface) const {

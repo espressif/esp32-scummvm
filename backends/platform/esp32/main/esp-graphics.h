@@ -109,7 +109,7 @@ private:
 	esp_lcd_panel_io_handle_t _io_handle = NULL;
 	esp_lcd_touch_handle_t _touch_handle;
 	ppa_client_handle_t _ppa;
-	uint16_t *_overlay;
+	Graphics::Surface _overlay;
 };
 
 #endif
