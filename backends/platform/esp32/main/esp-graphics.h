@@ -110,6 +110,7 @@ private:
 	esp_lcd_touch_handle_t _touch_handle;
 	ppa_client_handle_t _ppa;
 	Graphics::Surface _overlay;
+	byte _pal[256*3];
 };
 
 #endif

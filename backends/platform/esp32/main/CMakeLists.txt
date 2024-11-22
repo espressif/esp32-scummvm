@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.cpp" "esp-graphics.cpp"
+idf_component_register(SRCS "main.cpp" "esp-graphics.cpp" "esp-mixer.cpp"
                     INCLUDE_DIRS ".")
 
 #hack: otherwise audio.c is not linked

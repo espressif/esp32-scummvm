@@ -64,7 +64,7 @@ void EspGraphicsManager::initSize(uint width, uint height, const Graphics::Pixel
 	_width = width;
 	_height = height;
 	_format = format ? *format : Graphics::PixelFormat::createFormatCLUT8();
-	_surf.free();
+	_surf.free(); //note not sure if you can do this on an uninitialized surf
 	_surf.create(width, height, _format);
 }
 
@@ -88,45 +88,39 @@ void EspGraphicsManager::updateScreen() {
 	uint16_t *lcdbuf;
  	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
 	if (_overlayVisible) {
-		memcpy(lcdbuf, _overlay->getPixels(), SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
+		memcpy(lcdbuf, _overlay.getPixels(), SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
+	} else {
+		Graphics::Surface *surf=_surf.convertTo(getOverlayFormat(), _pal, 255);
+		ppa_srm_oper_config_t op={
+			.in={
+				.buffer=surf->getPixels(),
+				.pic_w=(uint32_t)surf->w,
+				.pic_h=(uint32_t)surf->h,
+				.block_w=(uint32_t)surf->w,
+				.block_h=(uint32_t)surf->h,
+				.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
+			},
+			.out={
+				.buffer=lcdbuf,
+				.buffer_size=SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(int16_t),
+				.pic_w=SCREEN_WIDTH,
+				.pic_h=SCREEN_HEIGHT,
+				.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
+			},
+			.scale_x=(float)SCREEN_WIDTH/(float)surf->w,
+			.scale_y=(float)SCREEN_HEIGHT/(float)surf->h,
+			.mode=PPA_TRANS_MODE_BLOCKING,
+		};
+		ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(_ppa, &op));
+		surf->free();
+		delete surf;
 	}
 	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
 }
 
 void EspGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen");
-//	uint16_t *lcdbuf;
-//	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(panel_handle, 1, (void**)&lcdbuf));
-
-/*
-	uint16_t *lcdbuf;
-	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(panel_handle, 1, (void**)&lcdbuf));
-
-	ppa_srm_oper_config_t op={
-		.in={
-			.buffer=buf,
-			.pic_w=pitch/2,
-			.pic_h=pitch/2, //assumption
-			.block_offset_x=x
-			.block_offset_y=y
-			.block_w=w,
-			.block_h=h,
-			.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
-		},
-		.out={
-			.buffer=lcdbuf,
-			.buffer_size=SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(int16_t),
-			.pic_w=SCREEN_WIDTH,
-			.pic_h=SCREEN_HEIGHT,
-			.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
-		},
-		.scale_x=(float)SCREEN_WIDTH/(float)FB_WIDTH,
-		.scale_y=(float)SCREEN_HEIGHT/(float)FB_HEIGHT,
-		.mode=PPA_TRANS_MODE_BLOCKING,
-	};
-	ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(_ppa, &op));
-	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
-*/
+	_surf.copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
 void EspGraphicsManager::beginGFXTransaction() {
@@ -140,22 +134,25 @@ OSystem::TransactionError EspGraphicsManager::endGFXTransaction() {
 
 void EspGraphicsManager::setPalette(const byte *colors, uint start, uint num) {
 	ESP_LOGI(TAG, "EspGraphicsManager::setPalette");
+	for (int i=0; i<num*3; i++) {
+		_pal[start*3+i]=colors[i];
+	}
 }
 
 void EspGraphicsManager::grabPalette(byte *colors, uint start, uint num) const {
 	ESP_LOGI(TAG, "EspGraphicsManager::grabPalette");
+	for (int i=0; i<num*3; i++) {
+		colors[i]=_pal[start*3+i];
+	}
 }
 
 void EspGraphicsManager::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
 	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToOverlay");
-	_overlay->copyRectToSurface(buf, pitch, x, y, w, h);
+	_overlay.copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
 void EspGraphicsManager::grabOverlay(Graphics::Surface &surface) const {
-	const byte *src = (const byte *)_overlay;
-	byte *dst = (byte *)surface.getPixels();
-	Graphics::copyBlit(dst, src, surface.pitch,
-		SCREEN_WIDTH*sizeof(uint16_t), SCREEN_WIDTH, SCREEN_HEIGHT, sizeof(uint16_t));
+	surface.copyFrom(_overlay);
 	ESP_LOGI(TAG, "EspGraphicsManager::grabOverlay");
 }
 
@@ -170,7 +167,6 @@ int16 EspGraphicsManager::getOverlayWidth() const {
 void EspGraphicsManager::clearOverlay() {
 	ESP_LOGI(TAG, "EspGraphicsManager::clearOverlay");
 	//should actually copy game screen to overlay...
-	memset((void*)_overlay, 0, SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
 }
 
 bool EspGraphicsManager::getTouch(Common::Point &pos) {
@@ -187,7 +183,8 @@ bool EspGraphicsManager::getTouch(Common::Point &pos) {
 			pos.y=(y*_height)/SCREEN_HEIGHT;
 		}
 		return true;
+	} else {
+		return false;
 	}
-	return false;
 }
 

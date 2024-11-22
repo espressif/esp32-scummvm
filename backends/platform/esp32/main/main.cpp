@@ -40,9 +40,9 @@
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
 #include "backends/events/default/default-events.h"
-#include "backends/mixer/null/null-mixer.h"
 #include "common/config-manager.h"
 #include "esp-graphics.h"
+#include "esp-mixer.h"
 #include "gui/debugger.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -83,6 +83,7 @@ private:
 	bool _silenceLogs;
 	bool _was_touched;
 	bool _mousedown_queued;
+	Common::Point _last_mouse_pos;
 	int64_t _last_ts_time_us;
 };
 
@@ -104,7 +105,7 @@ void OSystem_esp32::initBackend() {
 	EspGraphicsManager *gfx = new EspGraphicsManager();
 	_graphicsManager = gfx;
 	gfx->init();
-	_mixerManager = new NullMixerManager();
+	_mixerManager = new EspMixerManager(44100, 4096);
 	// Setup and start mixer
 	_mixerManager->init();
 
@@ -119,7 +120,7 @@ void OSystem_esp32::initBackend() {
 
 bool OSystem_esp32::pollEvent(Common::Event &event) {
 	((DefaultTimerManager *)getTimerManager())->checkTimers();
-	((NullMixerManager *)_mixerManager)->update(1);
+	((EspMixerManager *)_mixerManager)->updateAudio();
 
 
 	if (_mousedown_queued) {
@@ -134,17 +135,19 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 		Common::Point pos;
 		EspGraphicsManager *gfx=(EspGraphicsManager *)_graphicsManager;
 		bool touched=gfx->getTouch(pos);
-		if (touched && !_was_touched) {
+		if (touched) {
 			if (!_was_touched) _mousedown_queued=true;
-			event.type = Common::EVENT_MOUSEMOVE;
-			event.mouse = pos;
 //			ESP_LOGI(TAG, "ts %d,%d", pos.x, pos.y);
 			_was_touched = true;
+			event.type = Common::EVENT_MOUSEMOVE;
+			event.mouse = pos;
+			_last_mouse_pos = pos;
 			return true;
 		} else if (!touched && _was_touched) {
-			event.type = Common::EVENT_LBUTTONUP;
 //			ESP_LOGI(TAG, "ts up");
 			_was_touched = false;
+			event.type = Common::EVENT_LBUTTONUP;
+			event.mouse = _last_mouse_pos;
 			return true;
 		}
 	}
@@ -220,7 +223,8 @@ extern "C" {
 
 void main_task(void *param) {
 	// Invoke the actual ScummVM main entry point:
-	const char *argv[]={"scummvm", "-d", "11"};
+//	const char *argv[]={"scummvm", "-d", "11"};
+	const char *argv[]={"scummvm"};
 	int res = scummvm_main(sizeof(argv)/sizeof(argv[0]), argv);
 	ESP_LOGW(TAG, "Scummvm_main done");
 	g_system->destroy();
