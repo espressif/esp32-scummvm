@@ -3622,6 +3622,8 @@ if test -n "$_host"; then
 			_tremor=no
 			_zlib=yes
 			ZLIB_CFLAGS="-Ibackends/platform/esp32/managed_components/espressif__zlib/zlib/"
+			_ogg=yes
+			OGG_CFLAGS="-Ibackends/platform/esp32/managed_components/georgik__ogg/ogg/"
 			_vorbis=no
 			_port_mk="backends/platform/esp32/esp32.mk"
 			_seq_midi=no

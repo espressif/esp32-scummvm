@@ -30,6 +30,10 @@
 #include "esp_lcd_panel_ops.h"
 #include "driver/ppa.h"
 #include "bsp/touch.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
 
 class EspGraphicsManager : public GraphicsManager {
 public:
@@ -100,9 +104,12 @@ public:
 	bool getTouch(Common::Point &pos);
 
 private:
+	static void gfxTaskStub(void *arg);
+	void gfxTask();
+
 	uint _width, _height;
 	Graphics::PixelFormat _format;
-	Graphics::Surface _surf;
+	Graphics::Surface _surf[2];
 	bool _overlayVisible;
 	int64_t _last_time_updated;
 	esp_lcd_panel_handle_t _panel_handle = NULL;
@@ -110,7 +117,10 @@ private:
 	esp_lcd_touch_handle_t _touch_handle;
 	ppa_client_handle_t _ppa;
 	Graphics::Surface _overlay;
-	byte _pal[256*3];
+	byte _pal[2][256*3];
+	int _cur_fb;
+	QueueHandle_t _fb_num_q;
+	QueueHandle_t _fb_ret_q;
 };
 
 #endif

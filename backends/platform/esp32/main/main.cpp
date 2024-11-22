@@ -19,16 +19,17 @@
  *
  */
 
+
+#define FORBIDDEN_SYMBOL_ALLOW_ALL
+
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include "esp_log.h"
 #include "bsp/esp-bsp.h"
-
+#include "posixesp-fs-factory.h"
 
 #define TAG "main"
-
-#define FORBIDDEN_SYMBOL_ALLOW_ALL
 
 #include "../../../../../config.h"
 
@@ -48,11 +49,8 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_timer.h"
-
-/*
- * Include header files needed for the getFilesystemFactory() method.
- */
-#include "backends/fs/posix/posix-fs-factory.h"
+#include "usb_hid.h"
+#include "hid_keys.h"
 
 class OSystem_esp32 : public ModularMixerBackend, public ModularGraphicsBackend, Common::EventSource {
 public:
@@ -89,7 +87,7 @@ private:
 
 OSystem_esp32::OSystem_esp32(bool silenceLogs) :
 	_silenceLogs(silenceLogs) {
-	_fsFactory = new POSIXFilesystemFactory();
+	_fsFactory = new POSIXESPFilesystemFactory();
 }
 
 OSystem_esp32::~OSystem_esp32() {
@@ -118,6 +116,82 @@ void OSystem_esp32::initBackend() {
 	BaseBackend::initBackend();
 }
 
+//missing codes: backspace, enter (instead of return)
+static int keymap[][3] = {
+	{ KEY_ENTER, Common::KEYCODE_RETURN, Common::ASCII_RETURN },
+	{ KEY_UP, Common::KEYCODE_UP, 0 },
+	{ KEY_DOWN, Common::KEYCODE_DOWN, 0 },
+	{ KEY_LEFT, Common::KEYCODE_LEFT, 0 },
+	{ KEY_RIGHT, Common::KEYCODE_RIGHT, 0 },
+	{ KEY_LEFTSHIFT, Common::KEYCODE_LSHIFT, 0 },
+	{ KEY_RIGHTSHIFT, Common::KEYCODE_RSHIFT, 0 },
+	{ KEY_LEFTCTRL, Common::KEYCODE_LCTRL, 0 },
+	{ KEY_RIGHTCTRL, Common::KEYCODE_RCTRL, 0 },
+	{ KEY_LEFTALT, Common::KEYCODE_LALT, 0 },
+	{ KEY_RIGHTALT, Common::KEYCODE_RALT, 0 },
+	{ KEY_LEFTMETA, Common::KEYCODE_LMETA, 0 },
+	{ KEY_RIGHTMETA, Common::KEYCODE_RMETA, 0 },
+	{ KEY_KP0, Common::KEYCODE_KP0, '0' },
+	{ KEY_KP1, Common::KEYCODE_KP1, '1' },
+	{ KEY_KP2, Common::KEYCODE_KP2, '2' },
+	{ KEY_KP3, Common::KEYCODE_KP3, '3' },
+	{ KEY_KP4, Common::KEYCODE_KP4, '4' },
+	{ KEY_KP5, Common::KEYCODE_KP5, '5' },
+	{ KEY_KP6, Common::KEYCODE_KP6, '6' },
+	{ KEY_KP7, Common::KEYCODE_KP7, '7' },
+	{ KEY_KP8, Common::KEYCODE_KP8, '8' },
+	{ KEY_KP9, Common::KEYCODE_KP9, '9' },
+	{ KEY_HOME, Common::KEYCODE_HOME, 0 },
+	{ KEY_INSERT, Common::KEYCODE_INSERT, 0 },
+	{ KEY_END, Common::KEYCODE_END, 0 },
+	{ KEY_PAGEUP, Common::KEYCODE_PAGEUP, 0 },
+	{ KEY_PAGEDOWN, Common::KEYCODE_PAGEDOWN, 0 },
+	{ KEY_F1, Common::KEYCODE_F1, Common::ASCII_F1 },
+	{ KEY_F2, Common::KEYCODE_F2, Common::ASCII_F2 },
+	{ KEY_F3, Common::KEYCODE_F3, Common::ASCII_F3 },
+	{ KEY_F4, Common::KEYCODE_F4, Common::ASCII_F4 },
+	{ KEY_F5, Common::KEYCODE_F5, Common::ASCII_F5 },
+	{ KEY_F6, Common::KEYCODE_F6, Common::ASCII_F6 },
+	{ KEY_F7, Common::KEYCODE_F7, Common::ASCII_F7 },
+	{ KEY_F8, Common::KEYCODE_F8, Common::ASCII_F8 },
+	{ KEY_F9, Common::KEYCODE_F9, Common::ASCII_F9 },
+	{ KEY_F10, Common::KEYCODE_F10, Common::ASCII_F10 },
+	{ KEY_F11, Common::KEYCODE_F11, Common::ASCII_F11 },
+	{ KEY_F12, Common::KEYCODE_F12, Common::ASCII_F12 },
+	{ KEY_F13, Common::KEYCODE_F13, 0 },
+	{ KEY_F14, Common::KEYCODE_F14, 0 },
+	{ KEY_F15, Common::KEYCODE_F15, 0 },
+	{ KEY_A, Common::KEYCODE_a, 'a' },
+	{ KEY_B, Common::KEYCODE_b, 'b' },
+	{ KEY_C, Common::KEYCODE_c, 'c' },
+	{ KEY_D, Common::KEYCODE_d, 'd' },
+	{ KEY_E, Common::KEYCODE_e, 'e' },
+	{ KEY_F, Common::KEYCODE_f, 'f' },
+	{ KEY_G, Common::KEYCODE_g, 'g' },
+	{ KEY_H, Common::KEYCODE_h, 'h' },
+	{ KEY_I, Common::KEYCODE_i, 'i' },
+	{ KEY_J, Common::KEYCODE_j, 'j' },
+	{ KEY_K, Common::KEYCODE_k, 'k' },
+	{ KEY_L, Common::KEYCODE_l, 'l' },
+	{ KEY_M, Common::KEYCODE_m, 'm' },
+	{ KEY_N, Common::KEYCODE_n, 'n' },
+	{ KEY_O, Common::KEYCODE_o, 'o' },
+	{ KEY_P, Common::KEYCODE_p, 'p' },
+	{ KEY_Q, Common::KEYCODE_q, 'q' },
+	{ KEY_R, Common::KEYCODE_r, 'r' },
+	{ KEY_S, Common::KEYCODE_s, 's' },
+	{ KEY_T, Common::KEYCODE_t, 't' },
+	{ KEY_U, Common::KEYCODE_u, 'u' },
+	{ KEY_V, Common::KEYCODE_v, 'v' },
+	{ KEY_W, Common::KEYCODE_w, 'w' },
+	{ KEY_X, Common::KEYCODE_x, 'x' },
+	{ KEY_Y, Common::KEYCODE_y, 'y' },
+	{ KEY_Z, Common::KEYCODE_z, 'z' },
+	{ KEY_ESC, Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE},
+	{ 0, 0, 0 }
+};
+
+
 bool OSystem_esp32::pollEvent(Common::Event &event) {
 	((DefaultTimerManager *)getTimerManager())->checkTimers();
 	((EspMixerManager *)_mixerManager)->updateAudio();
@@ -128,7 +202,6 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 		_mousedown_queued=false;
 		return true;
 	}
-
 
 	if (esp_timer_get_time()-_last_ts_time_us>(1000000/60)) {
 		_last_ts_time_us=esp_timer_get_time();
@@ -149,6 +222,24 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 			event.type = Common::EVENT_LBUTTONUP;
 			event.mouse = _last_mouse_pos;
 			return true;
+		}
+	}
+
+	hid_ev_t ev;
+	if (usb_hid_receive_hid_event(&ev)) {
+		if (ev.type==HIDEV_EVENT_KEY_DOWN || ev.type==HIDEV_EVENT_KEY_UP) {
+			if (ev.type==HIDEV_EVENT_KEY_DOWN) event.type=Common::EVENT_KEYDOWN;
+			if (ev.type==HIDEV_EVENT_KEY_UP) event.type=Common::EVENT_KEYUP;
+			int i = 0;
+			while (keymap[i][0] != 0) {
+				if (keymap[i][0] == ev.key.keycode) {
+					event.kbd.keycode = static_cast<Common::KeyCode>(keymap[i][1]);
+					event.kbd.ascii = keymap[i][2];
+					//event.kbd.flags |= Common::KBD_SHIFT; _CTRL; _ALT;
+					return true;
+				}
+				i++;
+			}
 		}
 	}
 	return false;
@@ -230,6 +321,9 @@ void main_task(void *param) {
 	g_system->destroy();
 }
 
+void usbhidTaskStub(void *param) {
+	usb_hid_task();
+}
 
 
 int app_main() {
@@ -238,12 +332,14 @@ int app_main() {
 	g_system = OSystem_esp32_create(false);
 	assert(g_system);
 
-	int stack_depth=512*1024;
+	xTaskCreatePinnedToCore(usbhidTaskStub, "usbhid", 4096, NULL, 7, NULL, 1);
 
+
+	int stack_depth=512*1024;
 	StaticTask_t *taskbuf=(StaticTask_t*)calloc(1, sizeof(StaticTask_t));
 	uint8_t *stackbuf=(uint8_t*)calloc(stack_depth, 1);
 	xTaskCreateStaticPinnedToCore(main_task, "main", stack_depth, NULL, 2, (StackType_t*)stackbuf, taskbuf, 0);
 	return 0;
 }
 
-}
+} //extern c

@@ -1,7 +1,7 @@
 bundle_name = esp32-dist/scummvm
 
 libs: $(DETECT_OBJS) $(OBJS)
-	ar r libdetect.a $(DETECT_OBJS)
+	ar rcsP libdetect.a $(DETECT_OBJS)
 	ranlib libdetect.a
 
 libscummvm.a: $(DETECT_OBJS) $(OBJS)

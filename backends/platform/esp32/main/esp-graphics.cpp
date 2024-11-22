@@ -44,6 +44,80 @@
 #define SCREEN_WIDTH    BSP_LCD_H_RES
 #define SCREEN_HEIGHT   BSP_LCD_V_RES
 
+
+void EspGraphicsManager::gfxTaskStub(void *param) {
+	EspGraphicsManager *obj=(EspGraphicsManager*)param;
+	obj->gfxTask();
+}
+
+
+void EspGraphicsManager::gfxTask() {
+	uint16_t *rgbfb=NULL;
+	uint16_t pal16[256];
+	int rgbfb_w=0;
+	int rgbfb_h=0;
+
+	while(1) {
+		int fbno=0;
+		if (xQueueReceive(_fb_num_q, (void*)(&fbno), portMAX_DELAY)) {
+			uint16_t *lcdbuf;
+			ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
+			if (fbno==-1) {
+				//draw overlay
+				memcpy(lcdbuf, _overlay.getPixels(), SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
+			} else {
+				//see if intermediate buffer needs resizing
+				if (_surf[fbno].w!=rgbfb_w || _surf[fbno].h!=rgbfb_h) {
+					rgbfb_w=_surf[fbno].w;
+					rgbfb_h=_surf[fbno].h;
+					free(rgbfb);
+					//todo: should be dma aligned
+					rgbfb=(uint16_t*)calloc(rgbfb_w*rgbfb_h, sizeof(uint16_t));
+				}
+				//convert palette
+				for (int i=0; i<256; i++) {
+					int r=_pal[fbno][i*3+0];
+					int g=_pal[fbno][i*3+1];
+					int b=_pal[fbno][i*3+2];
+					pal16[i]=((r>>3)<<11)|((g>>2)<<5)|(b>>3);
+				}
+				//convert image
+				uint8_t *src=(uint8_t*)_surf[fbno].getPixels();
+				uint16_t *dst=rgbfb;
+				for (int i=0; i<rgbfb_w*rgbfb_h; i++) {
+					*dst++=pal16[*src++];
+				}
+				//scale into lcd memory
+				ppa_srm_oper_config_t op={
+					.in={
+						.buffer=rgbfb,
+						.pic_w=(uint32_t)rgbfb_w,
+						.pic_h=(uint32_t)rgbfb_h,
+						.block_w=(uint32_t)rgbfb_w,
+						.block_h=(uint32_t)rgbfb_h,
+						.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
+					},
+					.out={
+						.buffer=lcdbuf,
+						.buffer_size=SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(int16_t),
+						.pic_w=SCREEN_WIDTH,
+						.pic_h=SCREEN_HEIGHT,
+						.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
+					},
+					.scale_x=(float)SCREEN_WIDTH/(float)rgbfb_w,
+					.scale_y=(float)SCREEN_HEIGHT/(float)rgbfb_h,
+					.mode=PPA_TRANS_MODE_BLOCKING,
+				};
+				ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(_ppa, &op));
+			}
+			ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
+			xQueueSend(_fb_ret_q, &fbno, portMAX_DELAY);
+		}
+	}
+}
+
+
+
 void EspGraphicsManager::init() {
 	//initialize LCD
 	bsp_display_new(NULL, &_panel_handle, &_io_handle);
@@ -56,71 +130,66 @@ void EspGraphicsManager::init() {
 	ESP_ERROR_CHECK(ppa_register_client(&ppa_cfg, &_ppa));
 	_overlay.create(SCREEN_WIDTH, SCREEN_HEIGHT, getOverlayFormat());
 	ESP_ERROR_CHECK(bsp_touch_new(NULL, &_touch_handle));
+
+	_cur_fb=0;
+	_fb_num_q=xQueueCreate(1, sizeof(int));
+	_fb_ret_q=xQueueCreate(1, sizeof(int));
+	int fbno=1;
+	xQueueSend(_fb_ret_q, &fbno, portMAX_DELAY);
+	xTaskCreatePinnedToCore(gfxTaskStub, "gfx", 4096, (void*)this, 7, NULL, 1);
 }
 
 
 void EspGraphicsManager::initSize(uint width, uint height, const Graphics::PixelFormat *format) {
 	ESP_LOGI(TAG, "EspGraphicsManager::initSize %d %d", width, height);
+
+	int fbno;
+	//Wait until current frame is processed before we change things
+	xQueueReceive(_fb_ret_q, (void*)(&fbno), portMAX_DELAY);
+	xQueueSend(_fb_ret_q, &fbno, portMAX_DELAY);
+	//Gfx task should be idle now.
+
 	_width = width;
 	_height = height;
 	_format = format ? *format : Graphics::PixelFormat::createFormatCLUT8();
-	_surf.free(); //note not sure if you can do this on an uninitialized surf
-	_surf.create(width, height, _format);
+	for (int i=0; i<2; i++) {
+		_surf[i].free(); //note not sure if you can do this on an uninitialized surf
+		_surf[i].create(width, height, _format);
+	}
 }
 
 Graphics::Surface *EspGraphicsManager::lockScreen() {
 	ESP_LOGI(TAG, "EspGraphicsManager::lockScreen");
-	return &_surf;
+	return &_surf[_cur_fb];
 }
 
 void EspGraphicsManager::unlockScreen() {
 	ESP_LOGI(TAG, "EspGraphicsManager::unlockScreen");
-
 }
 
 void EspGraphicsManager::updateScreen() {
-	//limit to 60fps
-	if ((esp_timer_get_time()-_last_time_updated)<(1000000/60)) return;
+	//limit to 30fps
+	if ((esp_timer_get_time()-_last_time_updated)<(1000000/30)) return;
 	_last_time_updated=esp_timer_get_time();
 
-//	ESP_LOGI(TAG, "EspGraphicsManager::updateScreen ovl %d", _overlayVisible);
-
-	uint16_t *lcdbuf;
- 	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
+	int fbno;
 	if (_overlayVisible) {
-		memcpy(lcdbuf, _overlay.getPixels(), SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
+		fbno=-1;
 	} else {
-		Graphics::Surface *surf=_surf.convertTo(getOverlayFormat(), _pal, 255);
-		ppa_srm_oper_config_t op={
-			.in={
-				.buffer=surf->getPixels(),
-				.pic_w=(uint32_t)surf->w,
-				.pic_h=(uint32_t)surf->h,
-				.block_w=(uint32_t)surf->w,
-				.block_h=(uint32_t)surf->h,
-				.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
-			},
-			.out={
-				.buffer=lcdbuf,
-				.buffer_size=SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(int16_t),
-				.pic_w=SCREEN_WIDTH,
-				.pic_h=SCREEN_HEIGHT,
-				.srm_cm=PPA_SRM_COLOR_MODE_RGB565,
-			},
-			.scale_x=(float)SCREEN_WIDTH/(float)surf->w,
-			.scale_y=(float)SCREEN_HEIGHT/(float)surf->h,
-			.mode=PPA_TRANS_MODE_BLOCKING,
-		};
-		ESP_ERROR_CHECK(ppa_do_scale_rotate_mirror(_ppa, &op));
-		surf->free();
-		delete surf;
+		fbno=_cur_fb;
+		if (_cur_fb==0) _cur_fb=1; else _cur_fb=0;
+		//use fb we're going to display as base of fb we're going to modify next
+		_surf[_cur_fb].copyFrom(_surf[fbno]);
+		memcpy(_pal[_cur_fb], _pal[fbno], 256*3);
 	}
-	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
+	xQueueSend(_fb_num_q, &fbno, portMAX_DELAY);
+	//wait until the other one is done
+	xQueueReceive(_fb_ret_q, (void*)(&fbno), portMAX_DELAY);
 }
 
 void EspGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen");
-	_surf.copyRectToSurface(buf, pitch, x, y, w, h);
+	_surf[_cur_fb].copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
 void EspGraphicsManager::beginGFXTransaction() {
@@ -135,14 +204,14 @@ OSystem::TransactionError EspGraphicsManager::endGFXTransaction() {
 void EspGraphicsManager::setPalette(const byte *colors, uint start, uint num) {
 	ESP_LOGI(TAG, "EspGraphicsManager::setPalette");
 	for (int i=0; i<num*3; i++) {
-		_pal[start*3+i]=colors[i];
+		_pal[_cur_fb][start*3+i]=colors[i];
 	}
 }
 
 void EspGraphicsManager::grabPalette(byte *colors, uint start, uint num) const {
 	ESP_LOGI(TAG, "EspGraphicsManager::grabPalette");
 	for (int i=0; i<num*3; i++) {
-		colors[i]=_pal[start*3+i];
+		colors[i]=_pal[_cur_fb][start*3+i];
 	}
 }
 
