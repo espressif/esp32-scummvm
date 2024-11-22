@@ -1,16 +1,38 @@
 
-set(LIBS base/libbase.a engines/scumm/libscumm.a 
+#Enable engines to compile in here.
+set(ENGINES groovie scumm agi sky sci queen)
+
+#Sub-engines (indicated by a dash in the ./configure help)
+set(SUBENGINES scumm-7-8)
+
+#Note you may need to delete the build/ directory to force a reconfigure after 
+#changing this.
+
+#These are heuristics... technically the lib name could be entirely different from
+#the engine name, but for now it seems to work.
+foreach(engine ${ENGINES})
+	list(APPEND ENGINE_LIBS "engines/${engine}/lib${engine}.a")
+endforeach()
+foreach(engine ${ENGINES} ${SUBENGINES})
+	list(APPEND ENGINE_SW "--enable-engine=${engine}")
+endforeach()
+
+
+
+#The libs compiled by scummvm 'make libs' as defined in esp32.mk
+set(LIBS libdetect.a base/libbase.a ${ENGINE_LIBS}
 	engines/libengines.a gui/libgui.a backends/libbackends.a 
 	video/libvideo.a image/libimage.a graphics/libgraphics.a 
 	audio/libaudio.a math/libmath.a common/libcommon.a 
 	common/compression/libcompression.a common/formats/libformats.a 
-	common/lua/liblua.a libdetect.a )
+	common/lua/liblua.a )
 
+#Make scummvm dir into absolute path
 file(REAL_PATH ${COMPONENT_DIR}/../../../../.. SCUMMVM_DIR)
 
 list(TRANSFORM LIBS PREPEND "${SCUMMVM_DIR}/")
 
-idf_component_register(INCLUDE_DIRS "${SCUMMVM_DIR}/")
+idf_component_register(INCLUDE_DIRS "${SCUMMVM_DIR}/" WHOLE_ARCHIVE)
 
 include(ExternalProject)
 
@@ -24,7 +46,7 @@ externalproject_add(scummvm_build
 	CONFIGURE_COMMAND cd ${SCUMMVM_DIR}
 		COMMAND export CXXFLAGS=${CMAKE_CXX_FLAGS}
 		COMMAND export CFLAGS=${CMAKE_C_FLAGS}
-		COMMAND ./configure --host=esp32 --disable-all-engines --enable-engine=scumm
+		COMMAND ./configure --host=esp32 --disable-all-engines ${ENGINE_SW}
 	BUILD_IN_SOURCE 1
 	BUILD_ALWAYS 0
 	BUILD_COMMAND make -j -C "${SCUMMVM_DIR}" libs
@@ -36,6 +58,6 @@ externalproject_add(scummvm_build
 
 target_link_libraries(${COMPONENT_LIB} INTERFACE ${LIBS} scummvm_lib)
 
-add_prebuilt_library(scummvm_lib ${LIBS} PRIV_REQUIRES espressif__zlib)
+add_prebuilt_library(scummvm_lib ${LIBS} PRIV_REQUIRES espressif__zlib georgik__ogg)
 
 add_dependencies(scummvm_lib scummvm_build)
