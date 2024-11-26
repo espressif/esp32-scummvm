@@ -36,7 +36,7 @@
 #include "common/scummsys.h"
 
 #include "backends/modular-backend.h"
-#include "backends/mutex/null/null-mutex.h"
+#include "esp-mutex.h"
 #include "base/main.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
@@ -247,7 +247,7 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 }
 
 Common::MutexInternal *OSystem_esp32::createMutex() {
-	return new NullMutexInternal();
+	return createEspMutexInternal();
 }
 
 uint32 OSystem_esp32::getMillis(bool skipRecord) {
