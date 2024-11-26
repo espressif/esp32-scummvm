@@ -51,6 +51,7 @@
 #include "esp_timer.h"
 #include "usb_hid.h"
 #include "hid_keys.h"
+#include "mmc.h"
 
 class OSystem_esp32 : public ModularMixerBackend, public ModularGraphicsBackend, Common::EventSource {
 public:
@@ -327,7 +328,8 @@ void usbhidTaskStub(void *param) {
 
 
 int app_main() {
-	bsp_sdcard_mount();
+//	bsp_sdcard_mount();
+	sdcard_mount_blkcache("/sdcard", 15);
 
 	g_system = OSystem_esp32_create(false);
 	assert(g_system);

@@ -28,8 +28,8 @@
 
 
 
-#define CHUNKSZ (1024*4)
-#define RBSIZE (CHUNKSZ*8)
+#define CHUNKSZ (1024*2)
+#define RBSIZE (CHUNKSZ*32)
 
 /*
 ToDo: we dump fixed CHUNKSZ sized chunks into a ringbuf... may as well use a queue?
@@ -37,7 +37,7 @@ ToDo: we dump fixed CHUNKSZ sized chunks into a ringbuf... may as well use a que
 Ideally, the esp_codec thing acquires some sort of will_block functionality
 */
 
-#define DEFAULT_VOLUME 60
+#define DEFAULT_VOLUME 40
 
 void EspMixerManager::audioTaskStub(void *param) {
 	EspMixerManager *obj=(EspMixerManager*)param;
@@ -107,13 +107,13 @@ int EspMixerManager::resumeAudio() {
 void EspMixerManager::updateAudio() {
 	byte *buf;
 	int tries=0;
+	Audio::MixerImpl *mixer = (Audio::MixerImpl *)g_system->getMixer();
+	assert(mixer);
 	while(1) {
 		if (xRingbufferSendAcquire(_rb, (void**)&buf, CHUNKSZ, 0)) {
 			if (_audioSuspended) {
 				memset((void*)buf, 0, CHUNKSZ);
 			} else {
-				Audio::MixerImpl *mixer = (Audio::MixerImpl *)g_system->getMixer();
-				assert(mixer);
 				mixer->mixCallback(buf, CHUNKSZ);
 			}
 			xRingbufferSendComplete(_rb, (void*)buf);
@@ -121,7 +121,10 @@ void EspMixerManager::updateAudio() {
 			break;
 		}
 		tries++;
-		if (tries>10) return;
+		if (tries>32) {
+			printf("EspMixerManager::updateAudio: huh? Spun in audio gen loop for too long.\n");
+			return;
+		}
 	}
 }
 

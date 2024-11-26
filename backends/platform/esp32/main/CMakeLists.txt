@@ -1,5 +1,5 @@
 idf_component_register(SRCS "main.cpp" "esp-graphics.cpp" "esp-mixer.cpp" "posixesp-fs-factory.cpp"
-						"usb_hid.c" 
+						"usb_hid.c" "mmc.c"
                     INCLUDE_DIRS ".")
 
 #hack: otherwise audio.c is not linked
