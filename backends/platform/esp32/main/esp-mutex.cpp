@@ -44,7 +44,7 @@ private:
 
 
 EspMutexInternal::EspMutexInternal() {
-	_mutex=xSemaphoreCreateMutex();
+	_mutex=xSemaphoreCreateRecursiveMutex();
 }
 
 EspMutexInternal::~EspMutexInternal() {
@@ -52,12 +52,12 @@ EspMutexInternal::~EspMutexInternal() {
 }
 
 bool EspMutexInternal::lock() {
-	xSemaphoreTake(_mutex, portMAX_DELAY);
+	xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
 	return true;
 }
 
 bool EspMutexInternal::unlock() {
-	xSemaphoreGive(_mutex);
+	xSemaphoreGiveRecursive(_mutex);
 	return true;
 }
 
