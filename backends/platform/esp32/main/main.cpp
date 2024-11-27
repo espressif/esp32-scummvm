@@ -105,8 +105,7 @@ void OSystem_esp32::initBackend() {
 	EspGraphicsManager *gfx = new EspGraphicsManager();
 	_graphicsManager = gfx;
 	gfx->init();
-	_mixerManager = new EspMixerManager(44100, 4096);
-	// Setup and start mixer
+	_mixerManager = new EspMixerManager(44100, 2048);
 	_mixerManager->init();
 
 	ConfMan.registerDefault("extrapath", Common::Path("/sdcard/scummvm/extras/"));
@@ -250,12 +249,8 @@ Common::MutexInternal *OSystem_esp32::createMutex() {
 }
 
 uint32 OSystem_esp32::getMillis(bool skipRecord) {
-	timeval curTime;
-
-	gettimeofday(&curTime, 0);
-
-	return (uint32)(((curTime.tv_sec - _startTime.tv_sec) * 1000) +
-			((curTime.tv_usec - _startTime.tv_usec) / 1000));
+	uint64_t t_us=esp_timer_get_time();
+	return (uint32)(t_us/1000ULL);
 }
 
 void OSystem_esp32::delayMillis(uint msecs) {

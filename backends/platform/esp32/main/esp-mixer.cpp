@@ -40,20 +40,21 @@ void EspMixerManager::audioTaskStub(void *param) {
 
 void EspMixerManager::audioTask() {
 	byte *buf=(byte*)heap_caps_calloc(_bufSize, 1, MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
-	int64_t frame_time_us=((_bufSize/4)*1000000)/_freq;
+	int64_t frame_time_us=((int64_t)(_bufSize/4)*1000000ULL)/(int64_t)_freq;
 	while(1) {
+		int skip=0;
 		if (!_audioSuspended) {
 			int64_t t=esp_timer_get_time();
 			_mixer->mixCallback(buf, _bufSize);
 			t=esp_timer_get_time()-t;
 			if (t > frame_time_us) {
-				ESP_LOGW(TAG, "Audio frame calc overrun: took %d us to calc %d us worth of audio\n", (int)t, (int)frame_time_us);
-				vTaskDelay(1); //we're overrun anyway
+				ESP_LOGW(TAG, "Audio frame calc overrun: took %d us to calc %d us worth of audio", (int)t, (int)frame_time_us);
+				skip=1;
 			}
 		} else {
 			memset(buf, 0, _bufSize);
 		}
-		esp_codec_dev_write(_spk_codec_dev, buf, _bufSize);
+		if (!skip) esp_codec_dev_write(_spk_codec_dev, buf, _bufSize);
 	}
 }
 
@@ -68,7 +69,7 @@ EspMixerManager::~EspMixerManager() {
 }
 
 void EspMixerManager::init() {
-	_mixer = new Audio::MixerImpl(_freq, _bufSize / 4);
+	_mixer = new Audio::MixerImpl(_freq);
 	assert(_mixer);
 
 	bsp_i2c_init();
@@ -85,7 +86,8 @@ void EspMixerManager::init() {
 	};
 	esp_codec_dev_open(_spk_codec_dev, &fs);
 
-	xTaskCreatePinnedToCore(audioTaskStub, "audio", 1024*16, (void*)this, 7, NULL, 1);
+	//Audio actually is quite important; let any free core take it.
+	xTaskCreatePinnedToCore(audioTaskStub, "audio", 1024*16, (void*)this, 7, NULL, tskNO_AFFINITY);
 
 	_mixer->setReady(true);
 }

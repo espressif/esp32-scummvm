@@ -84,10 +84,14 @@ void EspGraphicsManager::gfxTask() {
 					pal16[i]=((r>>3)<<11)|((g>>2)<<5)|(b>>3);
 				}
 				//convert image
-				uint8_t *src=(uint8_t*)_surf[fbno].getPixels();
-				uint16_t *dst=rgbfb;
-				for (int i=0; i<rgbfb_w*rgbfb_h; i++) {
-					*dst++=pal16[*src++];
+				for (int y=_dirty[fbno].top; y<_dirty[fbno].bottom; y++) {
+					uint8_t *src=(uint8_t*)_surf[fbno].getPixels();
+					src=&src[_surf[fbno].w*y+_dirty[fbno].left];
+					uint16_t *dst=rgbfb;
+					dst=&dst[_surf[fbno].w*y+_dirty[fbno].left];
+					for (int x=_dirty[fbno].left; x<_dirty[fbno].right; x++) {
+						*dst++=pal16[*src++];
+					}
 				}
 
 				//scale into lcd memory
@@ -169,6 +173,7 @@ Graphics::Surface *EspGraphicsManager::lockScreen() {
 
 void EspGraphicsManager::unlockScreen() {
 	ESP_LOGI(TAG, "EspGraphicsManager::unlockScreen");
+	_dirty[_cur_fb]=Common::Rect(0,0,_surf[_cur_fb].w, _surf[_cur_fb].h);
 }
 
 void EspGraphicsManager::updateScreen() {
@@ -197,50 +202,66 @@ void EspGraphicsManager::updateScreen() {
 		//use fb we're going to display as base of fb we're going to modify next
 		memcpy(_surf[_cur_fb].getPixels(), _surf[fbno].getPixels(), _surf[fbno].w*_surf[fbno].h);
 		memcpy(_pal[_cur_fb], _pal[fbno], 256*3);
+		_dirty[_cur_fb]=Common::Rect(0, 0, 0, 0);
 	}
-	
-	ESP_LOGI(TAG, "EspGraphicsManager::updateScreen took %d us", (int)(esp_timer_get_time()-t));
+	t=esp_timer_get_time()-t;
+	if (t>33000) {
+		ESP_LOGW(TAG, "EspGraphicsManager::updateScreen took %d us!", (int)t);
+	}
 }
 
 void EspGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen %d,%d size %d,%d", x, y, w, h);
 	_surf[_cur_fb].copyRectToSurface(buf, pitch, x, y, w, h);
+	if (_dirty[_cur_fb].top==_dirty[_cur_fb].bottom) {
+		_dirty[_cur_fb].top=y;
+		_dirty[_cur_fb].bottom=y+h;
+		_dirty[_cur_fb].left=x;
+		_dirty[_cur_fb].right=x+w;
+	} else {
+		if (_dirty[_cur_fb].top>y) _dirty[_cur_fb].top=y;
+		if (_dirty[_cur_fb].bottom<y+h) _dirty[_cur_fb].bottom=y+h;
+		if (_dirty[_cur_fb].left>x) _dirty[_cur_fb].left=x;
+		if (_dirty[_cur_fb].right<x+w) _dirty[_cur_fb].right=x+w;
+	}
 }
 
 void EspGraphicsManager::beginGFXTransaction() {
-	ESP_LOGI(TAG, "EspGraphicsManager::beginGFXTransaction");
+//	ESP_LOGI(TAG, "EspGraphicsManager::beginGFXTransaction");
 }
 
 OSystem::TransactionError EspGraphicsManager::endGFXTransaction() {
-	ESP_LOGI(TAG, "EspGraphicsManager::endGFXTransaction");
+//	ESP_LOGI(TAG, "EspGraphicsManager::endGFXTransaction");
 	return OSystem::kTransactionSuccess;
 }
 
 void EspGraphicsManager::setPalette(const byte *colors, uint start, uint num) {
-	ESP_LOGI(TAG, "EspGraphicsManager::setPalette");
+//	ESP_LOGI(TAG, "EspGraphicsManager::setPalette");
 	int p=start*3;
 	for (int i=0; i<num*3; i++) {
 		if (p < 3*256) {
 			_pal[_cur_fb][p++]=colors[i];
 		}
 	}
+	//we need to recalculate the 16bit rgb surface.
+	_dirty[_cur_fb]=Common::Rect(0,0,_surf[_cur_fb].w, _surf[_cur_fb].h);
 }
 
 void EspGraphicsManager::grabPalette(byte *colors, uint start, uint num) const {
-	ESP_LOGI(TAG, "EspGraphicsManager::grabPalette");
+//	ESP_LOGI(TAG, "EspGraphicsManager::grabPalette");
 	for (int i=0; i<num*3; i++) {
 		colors[i]=_pal[_cur_fb][start*3+i];
 	}
 }
 
 void EspGraphicsManager::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
-	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToOverlay");
+//	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToOverlay");
 	_overlay.copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
 void EspGraphicsManager::grabOverlay(Graphics::Surface &surface) const {
 	surface.copyFrom(_overlay);
-	ESP_LOGI(TAG, "EspGraphicsManager::grabOverlay");
+//	ESP_LOGI(TAG, "EspGraphicsManager::grabOverlay");
 }
 
 int16 EspGraphicsManager::getOverlayHeight() const {
@@ -252,7 +273,7 @@ int16 EspGraphicsManager::getOverlayWidth() const {
 }
 
 void EspGraphicsManager::clearOverlay() {
-	ESP_LOGI(TAG, "EspGraphicsManager::clearOverlay");
+//	ESP_LOGI(TAG, "EspGraphicsManager::clearOverlay");
 	//should actually copy game screen to overlay...
 }
 
