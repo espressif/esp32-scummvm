@@ -47,6 +47,23 @@
 #define SCREEN_HEIGHT   BSP_LCD_V_RES
 
 
+bool EspGraphicsManager::hasFeature(OSystem::Feature f) const { 
+	if (f==OSystem::kFeatureTouchscreen) return true;
+	if (f==OSystem::kFeatureNoQuit) return true;
+	if (f==OSystem::kFeatureStretchMode) return true;
+	if (f==OSystem::kFeatureVirtualKeyboard) return true;
+	return false; 
+}
+
+void EspGraphicsManager::setFeatureState(OSystem::Feature f, bool enable) {
+
+}
+
+bool EspGraphicsManager::getFeatureState(OSystem::Feature f) const { 
+	return false; 
+}
+
+
 void EspGraphicsManager::gfxTaskStub(void *param) {
 	EspGraphicsManager *obj=(EspGraphicsManager*)param;
 	obj->gfxTask();
@@ -273,26 +290,26 @@ int16 EspGraphicsManager::getOverlayWidth() const {
 }
 
 void EspGraphicsManager::clearOverlay() {
-//	ESP_LOGI(TAG, "EspGraphicsManager::clearOverlay");
-	//should actually copy game screen to overlay...
+	//kinda icky but should work
+	uint16_t *lcdbuf;
+	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
+	memcpy(_overlay.getPixels(), lcdbuf, SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint16_t));
 }
 
-bool EspGraphicsManager::getTouch(Common::Point &pos) {
-	uint16_t x, y, strength;
+int EspGraphicsManager::getTouch(Common::Point &pos) {
+	uint16_t x[3], y[3], strength[3];
 	uint8_t num=0;
 	esp_lcd_touch_read_data(_touch_handle);
-	esp_lcd_touch_get_coordinates(_touch_handle, &x, &y, &strength, &num, 1);
-	if (num) {
+	esp_lcd_touch_get_coordinates(_touch_handle, x, y, strength, &num, 3);
+	if (num!=0) {
 		if (_overlayVisible) {
-			pos.x=x;
-			pos.y=y;
+			pos.x=x[0];
+			pos.y=y[0];
 		} else {
-			pos.x=(x*_width)/SCREEN_WIDTH;
-			pos.y=(y*_height)/SCREEN_HEIGHT;
+			pos.x=(x[0]*_width)/SCREEN_WIDTH;
+			pos.y=(y[0]*_height)/SCREEN_HEIGHT;
 		}
-		return true;
-	} else {
-		return false;
 	}
+	return num;
 }
 

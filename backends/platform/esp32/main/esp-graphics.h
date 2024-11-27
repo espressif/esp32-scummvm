@@ -40,13 +40,9 @@ public:
 	virtual ~EspGraphicsManager() {}
 
 	void init();
-	bool hasFeature(OSystem::Feature f) const override { 
-		if (f==OSystem::kFeatureTouchscreen) return true;
-		if (f==OSystem::kFeatureNoQuit) return true;
-		return false; 
-	}
-	void setFeatureState(OSystem::Feature f, bool enable) override {}
-	bool getFeatureState(OSystem::Feature f) const override { return false; }
+	bool hasFeature(OSystem::Feature f) const override;
+	void setFeatureState(OSystem::Feature f, bool enable) override;
+	bool getFeatureState(OSystem::Feature f) const override;
 
 #ifdef USE_RGB_COLOR
 	Graphics::PixelFormat getScreenFormat() const override {
@@ -101,7 +97,7 @@ public:
 	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override {}
 	void setCursorPalette(const byte *colors, uint start, uint num) override {}
 
-	bool getTouch(Common::Point &pos);
+	int getTouch(Common::Point &pos);
 
 private:
 	static void gfxTaskStub(void *arg);

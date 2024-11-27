@@ -46,7 +46,7 @@ externalproject_add(scummvm_build
 	CONFIGURE_COMMAND cd ${SCUMMVM_DIR}
 		COMMAND export CXXFLAGS=${CMAKE_CXX_FLAGS}
 		COMMAND export CFLAGS=${CMAKE_C_FLAGS}
-		COMMAND ./configure --host=esp32 --disable-all-engines ${ENGINE_SW}
+		COMMAND ./configure --host=esp32 --enable-vkeybd --disable-all-engines ${ENGINE_SW}
 	BUILD_IN_SOURCE 1
 	BUILD_ALWAYS 0
 	BUILD_COMMAND make -j -C "${SCUMMVM_DIR}" libs

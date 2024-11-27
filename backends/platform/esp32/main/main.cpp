@@ -80,7 +80,7 @@ protected:
 private:
 	timeval _startTime;
 	bool _silenceLogs;
-	bool _was_touched;
+	int _was_touched;
 	bool _mousedown_queued;
 	Common::Point _last_mouse_pos;
 	int64_t _last_ts_time_us;
@@ -196,6 +196,7 @@ static int keymap[][3] = {
 bool OSystem_esp32::pollEvent(Common::Event &event) {
 	((DefaultTimerManager *)getTimerManager())->checkTimers();
 
+	event.type=Common::EVENT_INVALID;
 	if (_mousedown_queued) {
 		event.type = Common::EVENT_LBUTTONDOWN;
 		_mousedown_queued=false;
@@ -206,22 +207,22 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 		_last_ts_time_us=esp_timer_get_time();
 		Common::Point pos;
 		EspGraphicsManager *gfx=(EspGraphicsManager *)_graphicsManager;
-		bool touched=gfx->getTouch(pos);
-		if (touched) {
-			if (!_was_touched) _mousedown_queued=true;
+		int touched=gfx->getTouch(pos);
+		if (touched==1) {
+			if (_was_touched==0) _mousedown_queued=true;
 //			ESP_LOGI(TAG, "ts %d,%d", pos.x, pos.y);
-			_was_touched = true;
 			event.type = Common::EVENT_MOUSEMOVE;
 			event.mouse = pos;
 			_last_mouse_pos = pos;
-			return true;
-		} else if (!touched && _was_touched) {
+		} else if (touched==0 && _was_touched==1) {
 //			ESP_LOGI(TAG, "ts up");
-			_was_touched = false;
 			event.type = Common::EVENT_LBUTTONUP;
 			event.mouse = _last_mouse_pos;
-			return true;
+		} else if (touched==2 && _was_touched!=2) {
+			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
 		}
+		_was_touched=touched;
+		if (event.type!=Common::EVENT_INVALID) return true;
 	}
 
 	hid_ev_t ev;
