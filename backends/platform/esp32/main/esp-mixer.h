@@ -55,16 +55,10 @@ public:
 	 */
 	virtual int resumeAudio();
 
-	/**
-	 * Updates the audio system
-	 */
-	void updateAudio();
-
 
 private:
 	static void audioTaskStub(void *arg);
 	void audioTask();
-	RingbufHandle_t _rb;
 	esp_codec_dev_handle_t _spk_codec_dev;
 
 

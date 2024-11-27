@@ -95,8 +95,8 @@ void sdcard_mount_blkcache(const char *mountpoint, int files) {
 	sdmmc_card_print_info(stdout, &card);
 
 	blkcache_config_t bcfg={
-		.blksize=1024*8,
-		.blkcount=8,
+		.blksize=1024*32,
+		.blkcount=16,
 		.read_sectors_cb=(read_sectors_t)sdmmc_read_sectors,
 		.write_sectors_cb=(write_sectors_t)sdmmc_write_sectors,
 		.arg=(void*)&card

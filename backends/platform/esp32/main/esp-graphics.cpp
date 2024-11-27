@@ -38,6 +38,8 @@
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_cpu.h"
+#include "esp_heap_caps.h"
 
 #define TAG "EspGraphics"
 
@@ -57,6 +59,7 @@ void EspGraphicsManager::gfxTask() {
 	int rgbfb_w=0;
 	int rgbfb_h=0;
 
+
 	while(1) {
 		int fbno=0;
 		if (xQueueReceive(_fb_num_q, (void*)(&fbno), portMAX_DELAY)) {
@@ -71,8 +74,7 @@ void EspGraphicsManager::gfxTask() {
 					rgbfb_w=_surf[fbno].w;
 					rgbfb_h=_surf[fbno].h;
 					free(rgbfb);
-					//todo: should be dma aligned
-					rgbfb=(uint16_t*)calloc(rgbfb_w*rgbfb_h, sizeof(uint16_t));
+					rgbfb = (uint16_t*)heap_caps_calloc(rgbfb_w*rgbfb_h, sizeof(uint16_t), MALLOC_CAP_DMA|MALLOC_CAP_SPIRAM);
 				}
 				//convert palette
 				for (int i=0; i<256; i++) {
@@ -87,6 +89,7 @@ void EspGraphicsManager::gfxTask() {
 				for (int i=0; i<rgbfb_w*rgbfb_h; i++) {
 					*dst++=pal16[*src++];
 				}
+
 				//scale into lcd memory
 				ppa_srm_oper_config_t op={
 					.in={
@@ -128,6 +131,7 @@ void EspGraphicsManager::init() {
 		.oper_type=PPA_OPERATION_SRM,
 	};
 	ESP_ERROR_CHECK(ppa_register_client(&ppa_cfg, &_ppa));
+
 	_overlay.create(SCREEN_WIDTH, SCREEN_HEIGHT, getOverlayFormat());
 	ESP_ERROR_CHECK(bsp_touch_new(NULL, &_touch_handle));
 
@@ -136,7 +140,7 @@ void EspGraphicsManager::init() {
 	_fb_ret_q=xQueueCreate(1, sizeof(int));
 	int fbno=1;
 	xQueueSend(_fb_ret_q, &fbno, portMAX_DELAY);
-	xTaskCreatePinnedToCore(gfxTaskStub, "gfx", 4096, (void*)this, 7, NULL, 1);
+	xTaskCreatePinnedToCore(gfxTaskStub, "gfx", 4096, (void*)this, 6, NULL, 1);
 }
 
 
@@ -172,23 +176,34 @@ void EspGraphicsManager::updateScreen() {
 	if ((esp_timer_get_time()-_last_time_updated)<(1000000/30)) return;
 	_last_time_updated=esp_timer_get_time();
 
+	uint64_t t=esp_timer_get_time();
+
 	int fbno;
 	if (_overlayVisible) {
 		fbno=-1;
 	} else {
 		fbno=_cur_fb;
-		if (_cur_fb==0) _cur_fb=1; else _cur_fb=0;
-		//use fb we're going to display as base of fb we're going to modify next
-		_surf[_cur_fb].copyFrom(_surf[fbno]);
-		memcpy(_pal[_cur_fb], _pal[fbno], 256*3);
+		if (fbno==0) _cur_fb=1; else _cur_fb=0;
 	}
+
 	xQueueSend(_fb_num_q, &fbno, portMAX_DELAY);
 	//wait until the other one is done
-	xQueueReceive(_fb_ret_q, (void*)(&fbno), portMAX_DELAY);
+	int ret_fbno;
+	xQueueReceive(_fb_ret_q, (void*)(&ret_fbno), portMAX_DELAY);
+	if (fbno!=-1 && ret_fbno!=_cur_fb) {
+		ESP_LOGW(TAG, "Huh, fbno != ret_fbno");
+	}
+	if (!_overlayVisible) {
+		//use fb we're going to display as base of fb we're going to modify next
+		memcpy(_surf[_cur_fb].getPixels(), _surf[fbno].getPixels(), _surf[fbno].w*_surf[fbno].h);
+		memcpy(_pal[_cur_fb], _pal[fbno], 256*3);
+	}
+	
+	ESP_LOGI(TAG, "EspGraphicsManager::updateScreen took %d us", (int)(esp_timer_get_time()-t));
 }
 
 void EspGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
-	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen");
+	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen %d,%d size %d,%d", x, y, w, h);
 	_surf[_cur_fb].copyRectToSurface(buf, pitch, x, y, w, h);
 }
 
@@ -203,8 +218,11 @@ OSystem::TransactionError EspGraphicsManager::endGFXTransaction() {
 
 void EspGraphicsManager::setPalette(const byte *colors, uint start, uint num) {
 	ESP_LOGI(TAG, "EspGraphicsManager::setPalette");
+	int p=start*3;
 	for (int i=0; i<num*3; i++) {
-		_pal[_cur_fb][start*3+i]=colors[i];
+		if (p < 3*256) {
+			_pal[_cur_fb][p++]=colors[i];
+		}
 	}
 }
 

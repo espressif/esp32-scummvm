@@ -1,9 +1,9 @@
 
 #Enable engines to compile in here.
-set(ENGINES groovie scumm agi sky sci queen)
+set(ENGINES groovie scumm agi sky sci queen parallaction sword1 sword2 )
 
 #Sub-engines (indicated by a dash in the ./configure help)
-set(SUBENGINES scumm-7-8)
+set(SUBENGINES scumm-7-8 sci32)
 
 #Note you may need to delete the build/ directory to force a reconfigure after 
 #changing this.

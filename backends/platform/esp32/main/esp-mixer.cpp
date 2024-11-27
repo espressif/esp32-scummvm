@@ -25,19 +25,13 @@
 
 #include "esp-mixer.h"
 #include "common/system.h"
-
-
-
-#define CHUNKSZ (1024*2)
-#define RBSIZE (CHUNKSZ*32)
-
-/*
-ToDo: we dump fixed CHUNKSZ sized chunks into a ringbuf... may as well use a queue?
-
-Ideally, the esp_codec thing acquires some sort of will_block functionality
-*/
+#include "esp_timer.h"
+#include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #define DEFAULT_VOLUME 40
+
+#define TAG "EspMixerManager"
 
 void EspMixerManager::audioTaskStub(void *param) {
 	EspMixerManager *obj=(EspMixerManager*)param;
@@ -45,15 +39,21 @@ void EspMixerManager::audioTaskStub(void *param) {
 }
 
 void EspMixerManager::audioTask() {
+	byte *buf=(byte*)heap_caps_calloc(_bufSize, 1, MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+	int64_t frame_time_us=((_bufSize/4)*1000000)/_freq;
 	while(1) {
-		size_t size;
-		byte *buf=(byte*)xRingbufferReceive(_rb, &size, portMAX_DELAY);
-		if (buf) {
-			if (size) {
-				esp_codec_dev_write(_spk_codec_dev, buf, size);
+		if (!_audioSuspended) {
+			int64_t t=esp_timer_get_time();
+			_mixer->mixCallback(buf, _bufSize);
+			t=esp_timer_get_time()-t;
+			if (t > frame_time_us) {
+				ESP_LOGW(TAG, "Audio frame calc overrun: took %d us to calc %d us worth of audio\n", (int)t, (int)frame_time_us);
+				vTaskDelay(1); //we're overrun anyway
 			}
-			vRingbufferReturnItem(_rb, (void*)buf);
+		} else {
+			memset(buf, 0, _bufSize);
 		}
+		esp_codec_dev_write(_spk_codec_dev, buf, _bufSize);
 	}
 }
 
@@ -62,7 +62,6 @@ EspMixerManager::EspMixerManager(int freq, int bufSize)
 	:
 	_freq(freq),
 	_bufSize(bufSize) {
-
 }
 
 EspMixerManager::~EspMixerManager() {
@@ -86,8 +85,7 @@ void EspMixerManager::init() {
 	};
 	esp_codec_dev_open(_spk_codec_dev, &fs);
 
-	_rb=xRingbufferCreate(RBSIZE, RINGBUF_TYPE_NOSPLIT);
-	xTaskCreatePinnedToCore(audioTaskStub, "audio", 4096, (void*)this, 7, NULL, 1);
+	xTaskCreatePinnedToCore(audioTaskStub, "audio", 1024*16, (void*)this, 7, NULL, 1);
 
 	_mixer->setReady(true);
 }
@@ -102,29 +100,5 @@ int EspMixerManager::resumeAudio() {
 
 	_audioSuspended = false;
 	return 0;
-}
-
-void EspMixerManager::updateAudio() {
-	byte *buf;
-	int tries=0;
-	Audio::MixerImpl *mixer = (Audio::MixerImpl *)g_system->getMixer();
-	assert(mixer);
-	while(1) {
-		if (xRingbufferSendAcquire(_rb, (void**)&buf, CHUNKSZ, 0)) {
-			if (_audioSuspended) {
-				memset((void*)buf, 0, CHUNKSZ);
-			} else {
-				mixer->mixCallback(buf, CHUNKSZ);
-			}
-			xRingbufferSendComplete(_rb, (void*)buf);
-		} else {
-			break;
-		}
-		tries++;
-		if (tries>32) {
-			printf("EspMixerManager::updateAudio: huh? Spun in audio gen loop for too long.\n");
-			return;
-		}
-	}
 }
 

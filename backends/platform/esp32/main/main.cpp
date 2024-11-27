@@ -89,6 +89,7 @@ private:
 OSystem_esp32::OSystem_esp32(bool silenceLogs) :
 	_silenceLogs(silenceLogs) {
 	_fsFactory = new POSIXESPFilesystemFactory();
+	_last_ts_time_us = 0;
 }
 
 OSystem_esp32::~OSystem_esp32() {
@@ -195,8 +196,6 @@ static int keymap[][3] = {
 
 bool OSystem_esp32::pollEvent(Common::Event &event) {
 	((DefaultTimerManager *)getTimerManager())->checkTimers();
-	((EspMixerManager *)_mixerManager)->updateAudio();
-
 
 	if (_mousedown_queued) {
 		event.type = Common::EVENT_LBUTTONDOWN;
@@ -204,7 +203,7 @@ bool OSystem_esp32::pollEvent(Common::Event &event) {
 		return true;
 	}
 
-	if (esp_timer_get_time()-_last_ts_time_us>(1000000/60)) {
+	if ((esp_timer_get_time()-_last_ts_time_us)>(1000000/60)) {
 		_last_ts_time_us=esp_timer_get_time();
 		Common::Point pos;
 		EspGraphicsManager *gfx=(EspGraphicsManager *)_graphicsManager;
@@ -260,6 +259,7 @@ uint32 OSystem_esp32::getMillis(bool skipRecord) {
 }
 
 void OSystem_esp32::delayMillis(uint msecs) {
+//	ESP_LOGI(TAG, "delayMillis %d", msecs);
 	vTaskDelay(pdMS_TO_TICKS(msecs));
 }
 
@@ -335,7 +335,6 @@ int app_main() {
 	assert(g_system);
 
 	xTaskCreatePinnedToCore(usbhidTaskStub, "usbhid", 4096, NULL, 7, NULL, 1);
-
 
 	int stack_depth=512*1024;
 	StaticTask_t *taskbuf=(StaticTask_t*)calloc(1, sizeof(StaticTask_t));
