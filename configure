@@ -3628,6 +3628,7 @@ if test -n "$_host"; then
 			_port_mk="backends/platform/esp32/esp32.mk"
 			_seq_midi=no
 			_timidity=no
+			_nuked_opl=no
 			;;
 		gamecube)
 			_backend="wii"

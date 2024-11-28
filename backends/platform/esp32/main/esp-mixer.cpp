@@ -29,7 +29,7 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
-#define DEFAULT_VOLUME 40
+#define DEFAULT_VOLUME 70
 
 #define TAG "EspMixerManager"
 

@@ -184,12 +184,12 @@ void EspGraphicsManager::initSize(uint width, uint height, const Graphics::Pixel
 }
 
 Graphics::Surface *EspGraphicsManager::lockScreen() {
-	ESP_LOGI(TAG, "EspGraphicsManager::lockScreen");
+	//ESP_LOGI(TAG, "EspGraphicsManager::lockScreen");
 	return &_surf[_cur_fb];
 }
 
 void EspGraphicsManager::unlockScreen() {
-	ESP_LOGI(TAG, "EspGraphicsManager::unlockScreen");
+	//ESP_LOGI(TAG, "EspGraphicsManager::unlockScreen");
 	_dirty[_cur_fb]=Common::Rect(0,0,_surf[_cur_fb].w, _surf[_cur_fb].h);
 }
 
@@ -228,7 +228,7 @@ void EspGraphicsManager::updateScreen() {
 }
 
 void EspGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
-	ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen %d,%d size %d,%d", x, y, w, h);
+	//ESP_LOGI(TAG, "EspGraphicsManager::copyRectToScreen %d,%d size %d,%d", x, y, w, h);
 	_surf[_cur_fb].copyRectToSurface(buf, pitch, x, y, w, h);
 	if (_dirty[_cur_fb].top==_dirty[_cur_fb].bottom) {
 		_dirty[_cur_fb].top=y;

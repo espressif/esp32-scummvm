@@ -189,6 +189,21 @@ static int keymap[][3] = {
 	{ KEY_Y, Common::KEYCODE_y, 'y' },
 	{ KEY_Z, Common::KEYCODE_z, 'z' },
 	{ KEY_ESC, Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE},
+	{ KEY_COMMA, Common::KEYCODE_COMMA, ',' },
+	{ KEY_DOT, Common::KEYCODE_PERIOD, '.' },
+	{ KEY_TAB, Common::KEYCODE_TAB, '\t' },
+	{ KEY_SPACE, Common::KEYCODE_SPACE, ' ' },
+	{ KEY_BACKSPACE, Common::KEYCODE_BACKSPACE, 0 },
+	{ KEY_GRAVE, Common::KEYCODE_BACKQUOTE, '`' },
+	{ KEY_MINUS, Common::KEYCODE_MINUS, '-' },
+	{ KEY_EQUAL, Common::KEYCODE_EQUALS, '=' },
+	{ KEY_LEFTBRACE, Common::KEYCODE_LEFTPAREN, '}' },
+	{ KEY_RIGHTBRACE, Common::KEYCODE_RIGHTPAREN, '{' },
+	{ KEY_BACKSLASH, Common::KEYCODE_BACKSLASH, '\\' },
+	{ KEY_SEMICOLON, Common::KEYCODE_SEMICOLON, ';' },
+	{ KEY_APOSTROPHE, Common::KEYCODE_QUOTE, '\'' },
+	{ KEY_SLASH, Common::KEYCODE_SLASH, '/' },
+	{ KEY_DELETE, Common::KEYCODE_DELETE, 0 },
 	{ 0, 0, 0 }
 };
 
