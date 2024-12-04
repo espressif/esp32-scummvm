@@ -1,6 +1,7 @@
 idf_component_register(SRCS "main.cpp" "esp-graphics.cpp" "esp-mixer.cpp" "posixesp-fs-factory.cpp"
 						"usb_hid.c" "mmc.c" "esp-mutex.cpp"
-                    INCLUDE_DIRS ".")
+                    INCLUDE_DIRS "."
+					EMBED_FILES "loading.png")
 
 #hack: otherwise audio.c is not linked
 #should actually factor refactor all things called by quake into a separate component

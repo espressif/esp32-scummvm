@@ -40,11 +40,17 @@
 #include "esp_log.h"
 #include "esp_cpu.h"
 #include "esp_heap_caps.h"
+#include "common/memstream.h"
+#include "image/image_decoder.h"
+#include "image/png.h"
 
 #define TAG "EspGraphics"
 
 #define SCREEN_WIDTH    BSP_LCD_H_RES
 #define SCREEN_HEIGHT   BSP_LCD_V_RES
+
+extern const uint8_t loading_png_start[] asm("_binary_loading_png_start");
+extern const uint8_t loading_png_end[] asm("_binary_loading_png_end");
 
 
 bool EspGraphicsManager::hasFeature(OSystem::Feature f) const { 
@@ -75,6 +81,8 @@ void EspGraphicsManager::gfxTask() {
 	uint16_t pal16[256];
 	int rgbfb_w=0;
 	int rgbfb_h=0;
+
+
 
 
 	while(1) {
@@ -148,6 +156,27 @@ void EspGraphicsManager::init() {
 	esp_lcd_panel_disp_on_off(_panel_handle, true);
 	bsp_display_brightness_init();
 	bsp_display_brightness_set(100);
+
+	//Show 'Loading...' image
+	uint16_t *lcdbuf;
+	ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(_panel_handle, 1, (void**)&lcdbuf));
+	Image::PNGDecoder d;
+	Common::MemoryReadStream str=Common::MemoryReadStream(loading_png_start, loading_png_end-loading_png_start);
+	d.loadStream(str);
+	const Graphics::Surface *s=d.getSurface();
+	uint8_t *p=(uint8_t*)s->getPixels();
+	for (int y=0; y<s->h; y++) {
+		uint16_t *q=&lcdbuf[SCREEN_WIDTH*((SCREEN_HEIGHT-s->h)/2+y)+(SCREEN_WIDTH-s->w)/2];
+		for (int x=0; x<s->w; x++) {
+			int r=*p++;
+			int g=*p++;
+			int b=*p++;
+			p++;
+			*q++=((r>>3)<<11)|((g>>2)<<5)|(b>>3);
+		}
+	}
+	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(_panel_handle, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, lcdbuf));
+
 	ppa_client_config_t ppa_cfg={
 		.oper_type=PPA_OPERATION_SRM,
 	};
@@ -159,6 +188,7 @@ void EspGraphicsManager::init() {
 	_cur_fb=0;
 	_fb_num_q=xQueueCreate(1, sizeof(int));
 	_fb_ret_q=xQueueCreate(1, sizeof(int));
+
 	int fbno=1;
 	xQueueSend(_fb_ret_q, &fbno, portMAX_DELAY);
 	xTaskCreatePinnedToCore(gfxTaskStub, "gfx", 4096, (void*)this, 6, NULL, 1);
@@ -181,6 +211,7 @@ void EspGraphicsManager::initSize(uint width, uint height, const Graphics::Pixel
 		_surf[i].free(); //note not sure if you can do this on an uninitialized surf
 		_surf[i].create(width, height, _format);
 	}
+
 }
 
 Graphics::Surface *EspGraphicsManager::lockScreen() {
