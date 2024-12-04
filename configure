@@ -3230,7 +3230,6 @@ EOF
 		append_var LDFLAGS "-r"
 		append_var LDFLAGS "-Wl,--gc-sections"
 		append_var LDFLAGS "-u scummvm_main -u OSystem_esp32_create"
-		_sdlpath="backends/platform/esp32/managed_components/georgik__sdl/SDL"
 		_detection_features_full=no
 		;;
 	freebsd* | dragonfly*)
@@ -3628,6 +3627,8 @@ if test -n "$_host"; then
 			ZLIB_CFLAGS="-Ibackends/platform/esp32/managed_components/espressif__zlib/zlib/"
 			_ogg=yes
 			OGG_CFLAGS="-Ibackends/platform/esp32/managed_components/georgik__ogg/ogg/"
+			_png=yes
+			PNG_CFLAGS="-Ibackends/platform/esp32/managed_components/espressif__libpng/libpng"
 			_vorbis=no
 			_port_mk="backends/platform/esp32/esp32.mk"
 			_seq_midi=no

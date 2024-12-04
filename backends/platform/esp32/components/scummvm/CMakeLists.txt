@@ -63,6 +63,6 @@ externalproject_add(scummvm_build
 
 target_link_libraries(${COMPONENT_LIB} INTERFACE ${LIBS} scummvm_lib)
 
-add_prebuilt_library(scummvm_lib ${LIBS} PRIV_REQUIRES espressif__zlib georgik__ogg)
+add_prebuilt_library(scummvm_lib ${LIBS} PRIV_REQUIRES espressif__zlib georgik__ogg espressif__libpng)
 
 add_dependencies(scummvm_lib scummvm_build)

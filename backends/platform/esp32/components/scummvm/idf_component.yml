@@ -2,3 +2,4 @@
 dependencies:
   espressif/zlib: "^1.3.0"
   georgik/ogg: "^1.3.5~1"
+  espressif/libpng: "^1.6.39~1"
