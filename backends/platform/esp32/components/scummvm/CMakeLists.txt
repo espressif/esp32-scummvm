@@ -40,10 +40,15 @@ idf_build_set_property(COMPILE_OPTIONS "-Wno-format" APPEND)
 
 get_property(COMPILE_FLAGS GLOBAL PROPERTY COMPILE_FLAGS)
 
+get_filename_component(compilerfile ${CMAKE_C_COMPILER} NAME)
+string(REGEX REPLACE "-[^-]*$" "" hostalias ${compilerfile})
+
 externalproject_add(scummvm_build
 	PREFIX "${COMPONENT_DIR}"
 	SOURCE_DIR "${SCUMMVM_DIR}"
 	CONFIGURE_COMMAND cd ${SCUMMVM_DIR}
+		#Note script uses this to figure out prefix
+		COMMAND export HOST_ALIAS=${hostalias}
 		COMMAND export CXXFLAGS=${CMAKE_CXX_FLAGS}
 		COMMAND export CFLAGS=${CMAKE_C_FLAGS}
 		COMMAND ./configure --host=esp32 --enable-vkeybd --disable-all-engines ${ENGINE_SW}

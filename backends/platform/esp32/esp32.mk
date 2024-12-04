@@ -2,9 +2,11 @@
 
 bundle_name = esp32-dist/scummvm
 
+#Note $(AR) is set to something like 'ar cr' and we need 'ar crP' so we need to bodge 
+#in the P after that. It's not a typo.
 libs: $(DETECT_OBJS) $(OBJS)
-	ar rcsP libdetect.a $(DETECT_OBJS)
-	ranlib libdetect.a
+	$(AR)P libdetect.a $(DETECT_OBJS)
+	$(RANLIB) libdetect.a
 
 esp32dist: libs
 	$(MKDIR) esp32dist/scummvm

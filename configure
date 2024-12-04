@@ -1701,8 +1701,9 @@ arm-*riscos)
 	;;
 esp32)
 	_host_os=espidf
-	_host_cpu=riscv
-	_host_alias=riscv32-esp-elf
+	# Note HOST_ALIAS is an environment variable set by backends/platform/esp32/components/scummvm/CMakeLists.txt
+	_host_cpu=`echo $HOST_ALIAS | cut -f 1 -d '-'`
+	_host_alias=${HOST_ALIAS}
 	;;
 raspberrypi)
 	_host_os=linux
@@ -2785,6 +2786,9 @@ case $_host_cpu in
 		echo "x86_64"
 		_have_amd64=yes
 		define_in_config_h_if_yes $_have_amd64 'HAVE_AMD64'
+		;;
+	xtensa*)
+		echo "Xtensa"
 		;;
 	*)
 		echo "unknown ($_host_cpu)"
