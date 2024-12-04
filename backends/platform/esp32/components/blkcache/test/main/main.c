@@ -7,6 +7,13 @@
 #include <assert.h>
 #include "esp_timer.h"
 
+/*
+This tests reads over multiple tasks.
+
+ToDo: somehow tests if writes are atomic...
+*/
+
+
 #define MAGIC 0x14512523
 
 int magicarg=MAGIC;
