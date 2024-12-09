@@ -2,7 +2,7 @@
 Scummvm for ESP32P4
 ===================
 
-This is a version of ScummVM that can build a ESP32P4 Scummvm backend. It's intended to run
+This is a fork of [ScummVM](https://github.com/scummvm/scummvm) that can build a ESP32P4 Scummvm backend. It's intended to run
 on an ESP32-P4-Function-EV board with attached 1024x600 MIPI display, plus optionally
 a standard keyboard connected to the USB host port. The backend code that adds this
 support is located in /backends/platform/esp32.
