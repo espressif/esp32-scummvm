@@ -2,9 +2,10 @@
 Scummvm for ESP32P4
 ===================
 
-This directory allows you to build the ESP32P4 Scummvm backend. It's intended to run
+This is a version of ScummVM that can build a ESP32P4 Scummvm backend. It's intended to run
 on an ESP32-P4-Function-EV board with attached 1024x600 MIPI display, plus optionally
-a standard keyboard connected to the USB host port.
+a standard keyboard connected to the USB host port. The backend code that adds this
+support is located in /backends/platform/esp32.
 
 Building
 --------
@@ -59,4 +60,8 @@ Issues
 * When using the Scummvm load/save option, you need an USB keyboard to enter a name as the onscreen
   keyboard does not work.
 
-* No volume control support yet
+* Some games assume they're driven by a computer mouse and require either hovering of the cursor without
+  clicking, or clicking with the left mouse button. These are not possible with the current touchscreen
+  code.
+
+* No volume control support yet.
